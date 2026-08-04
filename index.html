@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tenant Billing & Auto-Tracker</title>
+  <title>Tenant Billing & Cloud Auto-Tracker</title>
   <style>
     :root {
       --primary: #2563eb;
@@ -26,7 +26,23 @@
     h1 { font-size: 1.8rem; color: #0f172a; margin-bottom: 6px; }
     p.subtitle { color: #64748b; font-size: 0.95rem; }
 
-    /* Summary Dashboard Cards */
+    /* GitHub Settings Box */
+    .github-sync-card {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .github-inputs { display: flex; gap: 10px; flex-wrap: wrap; flex: 1; }
+    .github-inputs input { max-width: 300px; }
+
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -150,7 +166,17 @@
       align-items: center;
       gap: 6px;
     }
-    .btn-export:hover { background: #047857; }
+    .btn-sync {
+      background: #7c3aed;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .btn-sync:hover { background: #6d28d9; }
 
     .btn-action {
       border: none;
@@ -185,8 +211,19 @@
   <div class="container">
     <header>
       <h1>Tenant Record & Auto-Billing Tracker</h1>
-      <p class="subtitle">Auto-fetches previous readings & exports to Excel.</p>
+      <p class="subtitle">Cloud Sync Enabled - Access records from any device.</p>
     </header>
+
+    <!-- Cloud Sync Configuration -->
+    <div class="github-sync-card">
+      <div class="github-inputs">
+        <input type="password" id="ghToken" placeholder="Paste Personal Access Token (ghp_...)">
+        <button class="btn-sync" onclick="saveToken()">🔒 Save Token</button>
+        <button class="btn-sync" style="background:#2563eb;" onclick="loadFromGitHub()">🔄 Load Latest Data from Cloud</button>
+        <button class="btn-sync" style="background:#16a34a;" onclick="syncToGitHub()">☁️ Sync & Push Records to Cloud</button>
+      </div>
+      <span id="syncStatus" style="font-size: 0.85rem; font-weight: bold; color: #1e40af;">Status: Ready</span>
+    </div>
 
     <!-- KPI Totals Dashboard -->
     <div class="kpi-grid">
@@ -290,7 +327,6 @@
               <select id="paymentStatus">
                 <option value="no">No (Pending)</option>
                 <option value="yes">Yes (Paid Full)</option>
-                <option value="partial">Partial Payment</option>
               </select>
             </div>
 
@@ -305,7 +341,7 @@
             </div>
           </div>
 
-          <button type="submit" id="submitBtn" class="btn" style="margin-top: 15px;">Save Record</button>
+          <button type="submit" id="submitBtn" class="btn" style="margin-top: 15px;">Save Local Record</button>
         </form>
       </div>
 
@@ -380,26 +416,11 @@
   </div>
 
   <script>
-    const initialDefaultData = [
-      { id: 1722800000001, monthYear: "2026-08", tenantName: "Rohit Kumar", roomNo: "1", lastMeterUnit: 157, currentMeterUnit: 194, unitsConsumed: 37, ratePerUnit: 7, electricityAmount: 259, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5559, paymentStatus: "no", amountReceived: 0, balance: 5559, summaryMsg: "Units 37@7= Rs 259+300 Water+5000= 5559/- Rent" },
-      { id: 1722800000002, monthYear: "2026-08", tenantName: "Harish", roomNo: "2", lastMeterUnit: 136, currentMeterUnit: 174, unitsConsumed: 38, ratePerUnit: 7, electricityAmount: 266, waterCharges: 300, rentAmount: 4500, otherCharges: 0, totalAmount: 5066, paymentStatus: "no", amountReceived: 0, balance: 5066, summaryMsg: "Units 38@7= Rs 266+300 Water+4500= 5066/- Rent" },
-      { id: 1722800000003, monthYear: "2026-08", tenantName: "Parveen", roomNo: "3", lastMeterUnit: 141, currentMeterUnit: 178, unitsConsumed: 37, ratePerUnit: 7, electricityAmount: 259, waterCharges: 0, rentAmount: 8000, otherCharges: 0, totalAmount: 8259, paymentStatus: "no", amountReceived: 0, balance: 8259, summaryMsg: "Units 37@7= Rs 259+8000= 8259/- Rent" },
-      { id: 1722800000004, monthYear: "2026-08", tenantName: "Pankaj", roomNo: "4", lastMeterUnit: 165, currentMeterUnit: 200, unitsConsumed: 35, ratePerUnit: 7, electricityAmount: 245, waterCharges: 150, rentAmount: 4500, otherCharges: 0, totalAmount: 4745, paymentStatus: "no", amountReceived: 0, balance: 4745, summaryMsg: "Units 35@7= Rs 245+150 Water+4500= 4745/- Rent" },
-      { id: 1722800000006, monthYear: "2026-08", tenantName: "Mahindra", roomNo: "6", lastMeterUnit: 80, currentMeterUnit: 128, unitsConsumed: 48, ratePerUnit: 7, electricityAmount: 336, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5636, paymentStatus: "no", amountReceived: 0, balance: 5636, summaryMsg: "Units 48@7= Rs 336+300 Water+5000= 5636/- Rent" },
-      { id: 1722800000007, monthYear: "2026-08", tenantName: "Hariom", roomNo: "7", lastMeterUnit: 88, currentMeterUnit: 136, unitsConsumed: 48, ratePerUnit: 7, electricityAmount: 336, waterCharges: 300, rentAmount: 4500, otherCharges: 0, totalAmount: 5136, paymentStatus: "no", amountReceived: 0, balance: 5136, summaryMsg: "Units 48@7= Rs 336+300 Water+4500= 5136/- Rent" },
-      { id: 1722800000008, monthYear: "2026-08", tenantName: "Vipin", roomNo: "8", lastMeterUnit: 138, currentMeterUnit: 189, unitsConsumed: 51, ratePerUnit: 7, electricityAmount: 357, waterCharges: 0, rentAmount: 4000, otherCharges: 0, totalAmount: 4357, paymentStatus: "no", amountReceived: 0, balance: 4357, summaryMsg: "Units 51@7= Rs 357+4000= 4357/- Rent" },
-      { id: 1722800000009, monthYear: "2026-08", tenantName: "Rajkumar", roomNo: "9", lastMeterUnit: 91, currentMeterUnit: 131, unitsConsumed: 40, ratePerUnit: 7, electricityAmount: 280, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5580, paymentStatus: "no", amountReceived: 0, balance: 5580, summaryMsg: "Units 40@7= Rs 280+300 Water+5000= 5580/- Rent" },
-      { id: 1722800000010, monthYear: "2026-08", tenantName: "Sailendra/Chandan", roomNo: "10", lastMeterUnit: 2, currentMeterUnit: 90, unitsConsumed: 88, ratePerUnit: 7, electricityAmount: 616, waterCharges: 600, rentAmount: 8000, otherCharges: 0, totalAmount: 9216, paymentStatus: "no", amountReceived: 0, balance: 9216, summaryMsg: "Units 88@7= Rs 616+600 Water+8000= 9216/- Rent" },
-      { id: 1722800000011, monthYear: "2026-08", tenantName: "Ishant/Akhil", roomNo: "11", lastMeterUnit: 214, currentMeterUnit: 342, unitsConsumed: 128, ratePerUnit: 6, electricityAmount: 768, waterCharges: 300, rentAmount: 4000, otherCharges: 0, totalAmount: 5068, paymentStatus: "no", amountReceived: 0, balance: 5068, summaryMsg: "Units 128@6= Rs 768+300 Water+4000= 5068/- Rent" },
-      { id: 1722800000012, monthYear: "2026-08", tenantName: "Neelam", roomNo: "12", lastMeterUnit: 752, currentMeterUnit: 1080, unitsConsumed: 328, ratePerUnit: 6, electricityAmount: 1968, waterCharges: 300, rentAmount: 7500, otherCharges: 0, totalAmount: 9768, paymentStatus: "no", amountReceived: 0, balance: 9768, summaryMsg: "Units 328@6= Rs 1968+300 Water+7500= 9768/- Rent" }
-    ];
+    const GITHUB_USER = "mehartesting-sudo";
+    const GITHUB_REPO = "tenant-tracker";
+    const GITHUB_FILE = "data.json";
 
-    let storedRecords = localStorage.getItem("tenantRecordsV2");
-    let records = storedRecords ? JSON.parse(storedRecords) : initialDefaultData;
-
-    if (!storedRecords) {
-      localStorage.setItem("tenantRecordsV2", JSON.stringify(initialDefaultData));
-    }
+    let records = JSON.parse(localStorage.getItem("tenantRecordsV2") || "[]");
 
     const form = document.getElementById("tenantForm");
     const calcInputs = document.querySelectorAll(".calc-input");
@@ -412,14 +433,87 @@
     const submitBtn = document.getElementById("submitBtn");
     const filterMonthInput = document.getElementById("filterMonth");
     const paymentStatusSelect = document.getElementById("paymentStatus");
+    const syncStatus = document.getElementById("syncStatus");
 
     const currentMonthVal = "2026-08";
     document.getElementById("monthYear").value = currentMonthVal;
     filterMonthInput.value = currentMonthVal;
 
+    // Load Token on start
+    const savedToken = localStorage.getItem("gh_access_token") || "";
+    if (savedToken) document.getElementById("ghToken").value = savedToken;
+
+    function saveToken() {
+      const token = document.getElementById("ghToken").value.trim();
+      localStorage.setItem("gh_access_token", token);
+      alert("Token saved locally!");
+    }
+
+    async function loadFromGitHub() {
+      syncStatus.innerText = "Status: Loading from Cloud...";
+      try {
+        const res = await fetch(`https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/${GITHUB_FILE}?t=${Date.now()}`);
+        if (res.ok) {
+          records = await res.json();
+          localStorage.setItem("tenantRecordsV2", JSON.stringify(records));
+          renderTable();
+          syncStatus.innerText = "Status: Loaded from Cloud!";
+        } else {
+          syncStatus.innerText = "Status: No Cloud Data found yet. Sync to create it.";
+        }
+      } catch (err) {
+        syncStatus.innerText = "Status: Cloud Load Failed.";
+      }
+    }
+
+    async function syncToGitHub() {
+      const token = localStorage.getItem("gh_access_token");
+      if (!token) {
+        alert("Please paste and save your Personal Access Token first!");
+        return;
+      }
+
+      syncStatus.innerText = "Status: Syncing to Cloud...";
+
+      try {
+        // Step 1: Get File SHA if exists
+        let sha = "";
+        const getRes = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (getRes.ok) {
+          const fileData = await getRes.json();
+          sha = fileData.sha;
+        }
+
+        // Step 2: Upload/Update data.json
+        const content = btoa(unescape(encodeURIComponent(JSON.stringify(records, null, 2))));
+        const putRes = await fetch(`https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${GITHUB_FILE}`, {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            message: "Update tenant records from app",
+            content: content,
+            sha: sha || undefined
+          })
+        });
+
+        if (putRes.ok) {
+          syncStatus.innerText = "Status: Successfully Synced to GitHub Cloud! ✅";
+        } else {
+          syncStatus.innerText = "Status: Sync Failed. Check Token.";
+        }
+      } catch (err) {
+        syncStatus.innerText = "Status: Error syncing.";
+      }
+    }
+
     roomInput.addEventListener("input", () => {
       if (editingRecordId.value) return;
-
       const room = roomInput.value.trim().toLowerCase();
       if (!room) return;
 
@@ -436,7 +530,6 @@
         if (lastRecord.balance > 0) {
           document.getElementById("otherCharges").value = lastRecord.balance;
         }
-
         calculateBills();
       }
     });
@@ -447,7 +540,7 @@
 
       if (status === "yes") {
         document.getElementById("amountReceived").value = total;
-      } else if (status === "no") {
+      } else {
         document.getElementById("amountReceived").value = 0;
       }
       calculateBills();
@@ -525,9 +618,13 @@
       }
 
       localStorage.setItem("tenantRecordsV2", JSON.stringify(records));
-
       resetFormState();
       renderTable();
+      
+      // Auto Cloud Sync if Token exists
+      if (localStorage.getItem("gh_access_token")) {
+        syncToGitHub();
+      }
     });
 
     function selectUserSummary(id) {
@@ -566,7 +663,7 @@
       editingRecordId.value = "";
       editBanner.style.display = "none";
       formTitle.innerText = "New Bill Entry";
-      submitBtn.innerText = "Save Record";
+      submitBtn.innerText = "Save Local Record";
       submitBtn.style.backgroundColor = "var(--primary)";
 
       form.reset();
@@ -583,6 +680,7 @@
         localStorage.setItem("tenantRecordsV2", JSON.stringify(records));
         if (editingRecordId.value == id) cancelEdit();
         renderTable();
+        if (localStorage.getItem("gh_access_token")) syncToGitHub();
       }
     }
 
@@ -665,7 +763,7 @@
           row.className = "table-row-item";
           row.onclick = () => selectUserSummary(r.id);
 
-          const statusBadge = r.balance === 0 ? '<span class="badge-paid">Paid</span>' : (r.amountReceived > 0 ? '<span style="color: var(--warning);">Partial</span>' : '<span class="badge-due">Pending</span>');
+          const statusBadge = r.balance === 0 ? '<span class="badge-paid">Paid</span>' : '<span class="badge-due">Pending</span>';
 
           row.innerHTML = `
             <td style="white-space: nowrap;">
@@ -714,7 +812,7 @@
     document.getElementById("searchInput").addEventListener("input", renderTable);
     filterMonthInput.addEventListener("change", renderTable);
 
-    renderTable();
+    loadFromGitHub();
     calculateBills();
   </script>
 </body>
