@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tenant Billing & Auto-Tracker</title>
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --text: #1e293b;
+      --border: #cbd5e1;
+      --success: #16a34a;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --warning-hover: #d97706;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); padding: 20px; }
+    .container { max-width: 1450px; margin: 0 auto; }
+
+    header { margin-bottom: 24px; text-align: center; }
+    h1 { font-size: 1.8rem; color: #0f172a; margin-bottom: 6px; }
+    p.subtitle { color: #64748b; font-size: 0.95rem; }
+
+    .grid-layout {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    @media (max-width: 992px) {
+      .grid-layout { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .form-group { margin-bottom: 10px; }
+    label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: #334155; }
+    input {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.9rem;
+    }
+    input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+    input[readonly] { background-color: #f1f5f9; font-weight: 700; color: #0f172a; }
+
+    .edit-banner {
+      background-color: #fef3c7;
+      border: 1px solid #fde047;
+      color: #92400e;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      margin-bottom: 15px;
+      display: none;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .btn-cancel {
+      background: #dc2626;
+      color: white;
+      border: none;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+    }
+
+    .msg-preview {
+      background: #f0fdf4;
+      border: 1px dashed #22c55e;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+      min-height: 120px;
+      margin-bottom: 12px;
+      color: #14532d;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: var(--primary-hover); }
+    .btn-copy { background: #16a34a; }
+    .btn-copy:hover { background: #15803d; }
+
+    .btn-export {
+      background: #059669;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-export:hover { background: #047857; }
+
+    .btn-action {
+      border: none;
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: white;
+      margin-right: 4px;
+    }
+    .btn-edit { background-color: var(--warning); }
+    .btn-edit:hover { background-color: var(--warning-hover); }
+    .btn-delete { background-color: var(--danger); }
+    .btn-delete:hover { background-color: #dc2626; }
+
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; min-width: 1300px; }
+    th, td { padding: 10px; border: 1px solid var(--border); }
+    th { background-color: #f8fafc; font-weight: 700; color: #475569; }
+    tr:nth-child(even) { background-color: #f8fafc; }
+
+    .badge-due { color: var(--danger); font-weight: bold; }
+    .badge-paid { color: var(--success); font-weight: bold; }
+    .msg-col { font-family: monospace; font-size: 0.8rem; background: #fdffe7; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Tenant Record & Auto-Billing Tracker</h1>
+      <p class="subtitle">Auto-fetches previous readings & exports to Excel.</p>
+    </header>
+
+    <div class="grid-layout">
+      <!-- Input Form -->
+      <div class="card">
+        <div id="editBanner" class="edit-banner">
+          <span>Editing Record for Room <strong id="editRoomText"></strong></span>
+          <button type="button" class="btn-cancel" onclick="cancelEdit()">Cancel Edit</button>
+        </div>
+
+        <h2 id="formTitle" style="font-size: 1.1rem; margin-bottom: 15px;">New Bill Entry</h2>
+        <form id="tenantForm">
+          <input type="hidden" id="editingRecordId" value="">
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="monthYear">Month / Year</label>
+              <input type="month" id="monthYear" required>
+            </div>
+
+            <div class="form-group">
+              <label for="roomNo">Room No. (Type to Auto-Fill)</label>
+              <input type="text" id="roomNo" placeholder="e.g. 1" required>
+            </div>
+
+            <div class="form-group">
+              <label for="tenantName">Tenant Name</label>
+              <input type="text" id="tenantName" placeholder="e.g. Rohit Kumar" required>
+            </div>
+
+            <div class="form-group">
+              <label for="lastMeterUnit">Last Meter Unit</label>
+              <input type="number" id="lastMeterUnit" class="calc-input" step="0.01" value="0" min="0" required>
+            </div>
+
+            <div class="form-group">
+              <label for="currentMeterUnit">Current Meter Unit</label>
+              <input type="number" id="currentMeterUnit" class="calc-input" step="0.01" value="0" min="0" required>
+            </div>
+
+            <div class="form-group">
+              <label for="unitsConsumed">Units Consumed</label>
+              <input type="number" id="unitsConsumed" readonly value="0">
+            </div>
+
+            <div class="form-group">
+              <label for="ratePerUnit">Rate per Unit (₹/$)</label>
+              <input type="number" id="ratePerUnit" class="calc-input" step="0.01" value="7" min="0" required>
+            </div>
+
+            <div class="form-group">
+              <label for="electricityAmount">Electricity Amt (₹/$)</label>
+              <input type="number" id="electricityAmount" readonly value="0">
+            </div>
+
+            <div class="form-group">
+              <label for="waterCharges">Water Charges (₹/$)</label>
+              <input type="number" id="waterCharges" class="calc-input" step="0.01" value="0" min="0" required>
+            </div>
+
+            <div class="form-group">
+              <label for="rentAmount">Rent Amount (₹/$)</label>
+              <input type="number" id="rentAmount" class="calc-input" step="0.01" value="5000" min="0" required>
+            </div>
+
+            <div class="form-group">
+              <label for="otherCharges">Pending/Other Amt (₹/$)</label>
+              <input type="number" id="otherCharges" class="calc-input" step="0.01" value="0" min="0" required>
+            </div>
+
+            <div class="form-group">
+              <label for="totalAmount">Total Amount (₹/$)</label>
+              <input type="number" id="totalAmount" readonly value="0">
+            </div>
+
+            <div class="form-group">
+              <label for="amountReceived">Amount Received (₹/$)</label>
+              <input type="number" id="amountReceived" class="calc-input" step="0.01" value="0" min="0" required>
+            </div>
+
+            <div class="form-group">
+              <label for="balance">Balance Due (₹/$)</label>
+              <input type="number" id="balance" readonly value="0">
+            </div>
+          </div>
+
+          <button type="submit" id="submitBtn" class="btn" style="margin-top: 15px;">Save Record</button>
+        </form>
+      </div>
+
+      <!-- Generated Message Panel -->
+      <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+        <div>
+          <h2 style="font-size: 1.1rem; margin-bottom: 10px;">Tenant Bill Summary</h2>
+          <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">Copy this message directly to send to your tenant via WhatsApp/SMS:</p>
+          <div id="msgPreview" class="msg-preview">Units 0@0= Rs 0+5000= 5000/- Rent</div>
+        </div>
+        <button id="copyBtn" class="btn btn-copy" onclick="copyMessage()">Copy Message</button>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
+        <h2 style="font-size: 1.1rem;">History & Saved Bills</h2>
+        <div style="display: flex; gap: 10px;">
+          <input type="text" id="searchInput" placeholder="Search tenant or room..." style="width: 220px;">
+          <button class="btn-export" onclick="exportToCSV()">📥 Export to Excel (CSV)</button>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>Actions</th>
+              <th>Month</th>
+              <th>Room</th>
+              <th>Tenant</th>
+              <th>Last Unit</th>
+              <th>Current Unit</th>
+              <th>Units</th>
+              <th>Rate</th>
+              <th>Elec Amt</th>
+              <th>Water</th>
+              <th>Rent</th>
+              <th>Pending/Other</th>
+              <th>Total</th>
+              <th>Received</th>
+              <th>Balance</th>
+              <th>Generated Summary Message</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // PRE-LOADED SPREADSHEET DATA (August 2026) WITH UPDATED DYNAMIC WATER SUMMARY
+    const initialDefaultData = [
+      { id: 1722800000001, monthYear: "2026-08", tenantName: "Rohit Kumar", roomNo: "1", lastMeterUnit: 157, currentMeterUnit: 194, unitsConsumed: 37, ratePerUnit: 7, electricityAmount: 259, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5559, amountReceived: 0, balance: 5559, summaryMsg: "Units 37@7= Rs 259+300 Water+5000= 5559/- Rent" },
+      { id: 1722800000002, monthYear: "2026-08", tenantName: "Harish", roomNo: "2", lastMeterUnit: 136, currentMeterUnit: 174, unitsConsumed: 38, ratePerUnit: 7, electricityAmount: 266, waterCharges: 300, rentAmount: 4500, otherCharges: 0, totalAmount: 5066, amountReceived: 0, balance: 5066, summaryMsg: "Units 38@7= Rs 266+300 Water+4500= 5066/- Rent" },
+      { id: 1722800000003, monthYear: "2026-08", tenantName: "Parveen", roomNo: "3", lastMeterUnit: 141, currentMeterUnit: 178, unitsConsumed: 37, ratePerUnit: 7, electricityAmount: 259, waterCharges: 0, rentAmount: 8000, otherCharges: 0, totalAmount: 8259, amountReceived: 0, balance: 8259, summaryMsg: "Units 37@7= Rs 259+8000= 8259/- Rent" },
+      { id: 1722800000004, monthYear: "2026-08", tenantName: "Pankaj", roomNo: "4", lastMeterUnit: 165, currentMeterUnit: 200, unitsConsumed: 35, ratePerUnit: 7, electricityAmount: 245, waterCharges: 150, rentAmount: 4500, otherCharges: 0, totalAmount: 4745, amountReceived: 0, balance: 4745, summaryMsg: "Units 35@7= Rs 245+150 Water+4500= 4745/- Rent" },
+      { id: 1722800000006, monthYear: "2026-08", tenantName: "Mahindra", roomNo: "6", lastMeterUnit: 80, currentMeterUnit: 128, unitsConsumed: 48, ratePerUnit: 7, electricityAmount: 336, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5636, amountReceived: 0, balance: 5636, summaryMsg: "Units 48@7= Rs 336+300 Water+5000= 5636/- Rent" },
+      { id: 1722800000007, monthYear: "2026-08", tenantName: "Hariom", roomNo: "7", lastMeterUnit: 88, currentMeterUnit: 136, unitsConsumed: 48, ratePerUnit: 7, electricityAmount: 336, waterCharges: 300, rentAmount: 4500, otherCharges: 0, totalAmount: 5136, amountReceived: 0, balance: 5136, summaryMsg: "Units 48@7= Rs 336+300 Water+4500= 5136/- Rent" },
+      { id: 1722800000008, monthYear: "2026-08", tenantName: "Vipin", roomNo: "8", lastMeterUnit: 138, currentMeterUnit: 189, unitsConsumed: 51, ratePerUnit: 7, electricityAmount: 357, waterCharges: 0, rentAmount: 4000, otherCharges: 0, totalAmount: 4357, amountReceived: 0, balance: 4357, summaryMsg: "Units 51@7= Rs 357+4000= 4357/- Rent" },
+      { id: 1722800000009, monthYear: "2026-08", tenantName: "Rajkumar", roomNo: "9", lastMeterUnit: 91, currentMeterUnit: 131, unitsConsumed: 40, ratePerUnit: 7, electricityAmount: 280, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5580, amountReceived: 0, balance: 5580, summaryMsg: "Units 40@7= Rs 280+300 Water+5000= 5580/- Rent" },
+      { id: 1722800000010, monthYear: "2026-08", tenantName: "Sailendra/Chandan", roomNo: "10", lastMeterUnit: 2, currentMeterUnit: 90, unitsConsumed: 88, ratePerUnit: 7, electricityAmount: 616, waterCharges: 600, rentAmount: 8000, otherCharges: 0, totalAmount: 9216, amountReceived: 0, balance: 9216, summaryMsg: "Units 88@7= Rs 616+600 Water+8000= 9216/- Rent" },
+      { id: 1722800000011, monthYear: "2026-08", tenantName: "Ishant/Akhil", roomNo: "11", lastMeterUnit: 214, currentMeterUnit: 342, unitsConsumed: 128, ratePerUnit: 6, electricityAmount: 768, waterCharges: 300, rentAmount: 4000, otherCharges: 0, totalAmount: 5068, amountReceived: 0, balance: 5068, summaryMsg: "Units 128@6= Rs 768+300 Water+4000= 5068/- Rent" },
+      { id: 1722800000012, monthYear: "2026-08", tenantName: "Neelam", roomNo: "12", lastMeterUnit: 752, currentMeterUnit: 1080, unitsConsumed: 328, ratePerUnit: 6, electricityAmount: 1968, waterCharges: 300, rentAmount: 7500, otherCharges: 0, totalAmount: 9768, amountReceived: 0, balance: 9768, summaryMsg: "Units 328@6= Rs 1968+300 Water+7500= 9768/- Rent" }
+    ];
+
+    // Force refresh initial data to apply updated format
+    localStorage.setItem("tenantRecordsV2", JSON.stringify(initialDefaultData));
+    let records = initialDefaultData;
+
+    const form = document.getElementById("tenantForm");
+    const calcInputs = document.querySelectorAll(".calc-input");
+    const roomInput = document.getElementById("roomNo");
+    const msgPreview = document.getElementById("msgPreview");
+    const editingRecordId = document.getElementById("editingRecordId");
+    const editBanner = document.getElementById("editBanner");
+    const editRoomText = document.getElementById("editRoomText");
+    const formTitle = document.getElementById("formTitle");
+    const submitBtn = document.getElementById("submitBtn");
+
+    document.getElementById("monthYear").value = new Date().toISOString().slice(0, 7);
+
+    // AUTO-FETCH Previous Reading & Balance when Room No is typed
+    roomInput.addEventListener("input", () => {
+      if (editingRecordId.value) return;
+
+      const room = roomInput.value.trim().toLowerCase();
+      if (!room) return;
+
+      const history = records.filter(r => r.roomNo.toLowerCase() === room);
+      if (history.length > 0) {
+        history.sort((a, b) => b.id - a.id);
+        const lastRecord = history[0];
+
+        document.getElementById("lastMeterUnit").value = lastRecord.currentMeterUnit;
+        document.getElementById("tenantName").value = lastRecord.tenantName;
+        document.getElementById("rentAmount").value = lastRecord.rentAmount;
+        document.getElementById("ratePerUnit").value = lastRecord.ratePerUnit;
+        
+        if (lastRecord.balance > 0) {
+          document.getElementById("otherCharges").value = lastRecord.balance;
+        }
+
+        calculateBills();
+      }
+    });
+
+    function calculateBills() {
+      const lastUnit = parseFloat(document.getElementById("lastMeterUnit").value) || 0;
+      const currentUnit = parseFloat(document.getElementById("currentMeterUnit").value) || 0;
+      const rate = parseFloat(document.getElementById("ratePerUnit").value) || 0;
+      const water = parseFloat(document.getElementById("waterCharges").value) || 0;
+      const rent = parseFloat(document.getElementById("rentAmount").value) || 0;
+      const other = parseFloat(document.getElementById("otherCharges").value) || 0;
+      const received = parseFloat(document.getElementById("amountReceived").value) || 0;
+
+      let units = currentUnit - lastUnit;
+      if (units < 0) units = 0;
+      document.getElementById("unitsConsumed").value = units;
+
+      const electricityTotal = units * rate;
+      document.getElementById("electricityAmount").value = electricityTotal;
+
+      const total = electricityTotal + water + rent + other;
+      document.getElementById("totalAmount").value = total;
+
+      const balance = total - received;
+      document.getElementById("balance").value = balance;
+
+      // Dynamic Water String Construction
+      let waterText = water > 0 ? `+${water} Water` : ``;
+      let otherText = other > 0 ? `+${other} Pending` : ``;
+
+      const summaryMsg = `Units ${units}@${rate}= Rs ${electricityTotal}${waterText}${otherText}+${rent}= ${total}/- Rent`;
+      
+      msgPreview.innerText = summaryMsg;
+      return summaryMsg;
+    }
+
+    calcInputs.forEach(input => input.addEventListener("input", calculateBills));
+
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+
+      const summaryMsg = calculateBills();
+      const currentId = editingRecordId.value;
+
+      const recordData = {
+        id: currentId ? parseInt(currentId) : Date.now(),
+        monthYear: document.getElementById("monthYear").value,
+        tenantName: document.getElementById("tenantName").value,
+        roomNo: document.getElementById("roomNo").value,
+        lastMeterUnit: parseFloat(document.getElementById("lastMeterUnit").value) || 0,
+        currentMeterUnit: parseFloat(document.getElementById("currentMeterUnit").value) || 0,
+        unitsConsumed: parseFloat(document.getElementById("unitsConsumed").value) || 0,
+        ratePerUnit: parseFloat(document.getElementById("ratePerUnit").value) || 0,
+        electricityAmount: parseFloat(document.getElementById("electricityAmount").value) || 0,
+        waterCharges: parseFloat(document.getElementById("waterCharges").value) || 0,
+        rentAmount: parseFloat(document.getElementById("rentAmount").value) || 0,
+        otherCharges: parseFloat(document.getElementById("otherCharges").value) || 0,
+        totalAmount: parseFloat(document.getElementById("totalAmount").value) || 0,
+        amountReceived: parseFloat(document.getElementById("amountReceived").value) || 0,
+        balance: parseFloat(document.getElementById("balance").value) || 0,
+        summaryMsg: summaryMsg
+      };
+
+      if (currentId) {
+        const index = records.findIndex(r => r.id === parseInt(currentId));
+        if (index !== -1) records[index] = recordData;
+      } else {
+        records.push(recordData);
+      }
+
+      localStorage.setItem("tenantRecordsV2", JSON.stringify(records));
+
+      resetFormState();
+      renderTable();
+    });
+
+    function editRecord(id) {
+      const record = records.find(r => r.id === id);
+      if (!record) return;
+
+      editingRecordId.value = record.id;
+      document.getElementById("monthYear").value = record.monthYear;
+      document.getElementById("roomNo").value = record.roomNo;
+      document.getElementById("tenantName").value = record.tenantName;
+      document.getElementById("lastMeterUnit").value = record.lastMeterUnit;
+      document.getElementById("currentMeterUnit").value = record.currentMeterUnit;
+      document.getElementById("ratePerUnit").value = record.ratePerUnit;
+      document.getElementById("waterCharges").value = record.waterCharges;
+      document.getElementById("rentAmount").value = record.rentAmount;
+      document.getElementById("otherCharges").value = record.otherCharges;
+      document.getElementById("amountReceived").value = record.amountReceived;
+
+      editRoomText.innerText = record.roomNo;
+      editBanner.style.display = "flex";
+      formTitle.innerText = "Edit Existing Bill Record";
+      submitBtn.innerText = "Update Record";
+      submitBtn.style.backgroundColor = "var(--warning)";
+
+      calculateBills();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function cancelEdit() {
+      resetFormState();
+      calculateBills();
+    }
+
+    function resetFormState() {
+      editingRecordId.value = "";
+      editBanner.style.display = "none";
+      formTitle.innerText = "New Bill Entry";
+      submitBtn.innerText = "Save Record";
+      submitBtn.style.backgroundColor = "var(--primary)";
+
+      form.reset();
+      document.getElementById("monthYear").value = new Date().toISOString().slice(0, 7);
+      document.getElementById("ratePerUnit").value = 7;
+      document.getElementById("rentAmount").value = 5000;
+    }
+
+    function deleteRecord(id) {
+      if (confirm("Are you sure you want to delete this record?")) {
+        records = records.filter(r => r.id !== id);
+        localStorage.setItem("tenantRecordsV2", JSON.stringify(records));
+        if (editingRecordId.value == id) cancelEdit();
+        renderTable();
+      }
+    }
+
+    function copyMessage() {
+      navigator.clipboard.writeText(msgPreview.innerText);
+      const btn = document.getElementById("copyBtn");
+      btn.innerText = "Copied!";
+      setTimeout(() => btn.innerText = "Copy Message", 2000);
+    }
+
+    function exportToCSV() {
+      if (records.length === 0) {
+        alert("No records found to export.");
+        return;
+      }
+
+      const headers = ["Month/Year", "Room No", "Tenant Name", "Last Meter Unit", "Current Meter Unit", "Units Consumed", "Rate per Unit", "Electricity Amount", "Water Charges", "Rent Amount", "Pending/Other Charges", "Total Amount", "Amount Received", "Balance Due", "Summary Message"];
+      const csvRows = [headers.join(",")];
+
+      records.forEach(r => {
+        const row = [
+          `"${r.monthYear}"`,
+          `"${r.roomNo.replace(/"/g, '""')}"`,
+          `"${r.tenantName.replace(/"/g, '""')}"`,
+          r.lastMeterUnit,
+          r.currentMeterUnit,
+          r.unitsConsumed,
+          r.ratePerUnit,
+          r.electricityAmount,
+          r.waterCharges,
+          r.rentAmount,
+          r.otherCharges,
+          r.totalAmount,
+          r.amountReceived,
+          r.balance,
+          `"${r.summaryMsg.replace(/"/g, '""')}"`
+        ];
+        csvRows.push(row.join(","));
+      });
+
+      const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.setAttribute("href", URL.createObjectURL(blob));
+      link.setAttribute("download", `Tenant_Records_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function renderTable() {
+      const search = document.getElementById("searchInput").value.toLowerCase();
+      const filtered = records.filter(r => 
+        r.tenantName.toLowerCase().includes(search) || 
+        r.roomNo.toLowerCase().includes(search)
+      );
+
+      const tableBody = document.getElementById("tableBody");
+      tableBody.innerHTML = "";
+
+      filtered.sort((a, b) => b.id - a.id).forEach(r => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td style="white-space: nowrap;">
+            <button class="btn-action btn-edit" onclick="editRecord(${r.id})">Edit</button>
+            <button class="btn-action btn-delete" onclick="deleteRecord(${r.id})">Delete</button>
+          </td>
+          <td>${r.monthYear}</td>
+          <td>${r.roomNo}</td>
+          <td><strong>${r.tenantName}</strong></td>
+          <td>${r.lastMeterUnit}</td>
+          <td>${r.currentMeterUnit}</td>
+          <td>${r.unitsConsumed}</td>
+          <td>${r.ratePerUnit}</td>
+          <td>${r.electricityAmount}</td>
+          <td>${r.waterCharges}</td>
+          <td>${r.rentAmount}</td>
+          <td>${r.otherCharges}</td>
+          <td><strong>${r.totalAmount}</strong></td>
+          <td>${r.amountReceived}</td>
+          <td class="${r.balance > 0 ? 'badge-due' : 'badge-paid'}">${r.balance}</td>
+          <td class="msg-col">${r.summaryMsg}</td>
+        `;
+        tableBody.appendChild(row);
+      });
+    }
+
+    document.getElementById("searchInput").addEventListener("input", renderTable);
+
+    renderTable();
+    calculateBills();
+  </script>
+</body>
+</html>
