@@ -20,17 +20,37 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
     body { background-color: var(--bg); color: var(--text); padding: 20px; }
-    .container { max-width: 1450px; margin: 0 auto; }
+    .container { max-width: 1550px; margin: 0 auto; }
 
-    header { margin-bottom: 24px; text-align: center; }
+    header { margin-bottom: 20px; text-align: center; }
     h1 { font-size: 1.8rem; color: #0f172a; margin-bottom: 6px; }
     p.subtitle { color: #64748b; font-size: 0.95rem; }
+
+    /* Summary Dashboard Cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .kpi-card {
+      background: var(--card-bg);
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      text-align: center;
+    }
+
+    .kpi-card span { display: block; font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
+    .kpi-card strong { font-size: 1.3rem; color: #0f172a; }
 
     .grid-layout {
       display: grid;
       grid-template-columns: 2fr 1fr;
       gap: 20px;
-      margin-bottom: 30px;
+      margin-bottom: 25px;
     }
 
     @media (max-width: 992px) {
@@ -47,7 +67,7 @@
 
     .form-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
       gap: 12px;
     }
 
@@ -148,9 +168,10 @@
     .btn-delete:hover { background-color: #dc2626; }
 
     .table-wrapper { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; min-width: 1300px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; min-width: 1400px; }
     th, td { padding: 10px; border: 1px solid var(--border); }
     th { background-color: #f8fafc; font-weight: 700; color: #475569; }
+    tfoot tr { background-color: #f1f5f9; font-weight: bold; }
     tr.table-row-item { cursor: pointer; transition: background 0.15s; }
     tr.table-row-item:hover { background-color: #f1f5f9 !important; }
 
@@ -166,6 +187,30 @@
       <h1>Tenant Record & Auto-Billing Tracker</h1>
       <p class="subtitle">Auto-fetches previous readings & exports to Excel.</p>
     </header>
+
+    <!-- KPI Totals Dashboard -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <span>Total Rent Income</span>
+        <strong id="kpiRent">₹0</strong>
+      </div>
+      <div class="kpi-card">
+        <span>Total Elec Income</span>
+        <strong id="kpiElec">₹0</strong>
+      </div>
+      <div class="kpi-card">
+        <span>Total Water Income</span>
+        <strong id="kpiWater">₹0</strong>
+      </div>
+      <div class="kpi-card">
+        <span>Total Amount Collected</span>
+        <strong id="kpiReceived" style="color: var(--success);">₹0</strong>
+      </div>
+      <div class="kpi-card">
+        <span>Total Pending Balance</span>
+        <strong id="kpiPending" style="color: var(--danger);">₹0</strong>
+      </div>
+    </div>
 
     <div class="grid-layout">
       <!-- Input Form -->
@@ -241,6 +286,15 @@
             </div>
 
             <div class="form-group">
+              <label for="paymentStatus">Rent Received?</label>
+              <select id="paymentStatus">
+                <option value="no">No (Pending)</option>
+                <option value="yes">Yes (Paid Full)</option>
+                <option value="partial">Partial Payment</option>
+              </select>
+            </div>
+
+            <div class="form-group">
               <label for="amountReceived">Amount Received (₹/$)</label>
               <input type="number" id="amountReceived" class="calc-input" step="0.01" value="0" min="0" required>
             </div>
@@ -295,31 +349,49 @@
               <th>Rent</th>
               <th>Pending/Other</th>
               <th>Total</th>
+              <th>Status</th>
               <th>Received</th>
               <th>Balance</th>
               <th>Generated Summary Message</th>
             </tr>
           </thead>
           <tbody id="tableBody"></tbody>
+          <tfoot>
+            <tr>
+              <td colspan="4">TOTALS (Selected Month)</td>
+              <td id="totLast">--</td>
+              <td id="totCurr">--</td>
+              <td id="totUnits">0</td>
+              <td>--</td>
+              <td id="totElec">₹0</td>
+              <td id="totWater">₹0</td>
+              <td id="totRent">₹0</td>
+              <td id="totOther">₹0</td>
+              <td id="totBill">₹0</td>
+              <td>--</td>
+              <td id="totRec" style="color: var(--success);">₹0</td>
+              <td id="totBal" style="color: var(--danger);">₹0</td>
+              <td>--</td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>
   </div>
 
   <script>
-    // PRE-LOADED DATA
     const initialDefaultData = [
-      { id: 1722800000001, monthYear: "2026-08", tenantName: "Rohit Kumar", roomNo: "1", lastMeterUnit: 157, currentMeterUnit: 194, unitsConsumed: 37, ratePerUnit: 7, electricityAmount: 259, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5559, amountReceived: 0, balance: 5559, summaryMsg: "Units 37@7= Rs 259+300 Water+5000= 5559/- Rent" },
-      { id: 1722800000002, monthYear: "2026-08", tenantName: "Harish", roomNo: "2", lastMeterUnit: 136, currentMeterUnit: 174, unitsConsumed: 38, ratePerUnit: 7, electricityAmount: 266, waterCharges: 300, rentAmount: 4500, otherCharges: 0, totalAmount: 5066, amountReceived: 0, balance: 5066, summaryMsg: "Units 38@7= Rs 266+300 Water+4500= 5066/- Rent" },
-      { id: 1722800000003, monthYear: "2026-08", tenantName: "Parveen", roomNo: "3", lastMeterUnit: 141, currentMeterUnit: 178, unitsConsumed: 37, ratePerUnit: 7, electricityAmount: 259, waterCharges: 0, rentAmount: 8000, otherCharges: 0, totalAmount: 8259, amountReceived: 0, balance: 8259, summaryMsg: "Units 37@7= Rs 259+8000= 8259/- Rent" },
-      { id: 1722800000004, monthYear: "2026-08", tenantName: "Pankaj", roomNo: "4", lastMeterUnit: 165, currentMeterUnit: 200, unitsConsumed: 35, ratePerUnit: 7, electricityAmount: 245, waterCharges: 150, rentAmount: 4500, otherCharges: 0, totalAmount: 4745, amountReceived: 0, balance: 4745, summaryMsg: "Units 35@7= Rs 245+150 Water+4500= 4745/- Rent" },
-      { id: 1722800000006, monthYear: "2026-08", tenantName: "Mahindra", roomNo: "6", lastMeterUnit: 80, currentMeterUnit: 128, unitsConsumed: 48, ratePerUnit: 7, electricityAmount: 336, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5636, amountReceived: 0, balance: 5636, summaryMsg: "Units 48@7= Rs 336+300 Water+5000= 5636/- Rent" },
-      { id: 1722800000007, monthYear: "2026-08", tenantName: "Hariom", roomNo: "7", lastMeterUnit: 88, currentMeterUnit: 136, unitsConsumed: 48, ratePerUnit: 7, electricityAmount: 336, waterCharges: 300, rentAmount: 4500, otherCharges: 0, totalAmount: 5136, amountReceived: 0, balance: 5136, summaryMsg: "Units 48@7= Rs 336+300 Water+4500= 5136/- Rent" },
-      { id: 1722800000008, monthYear: "2026-08", tenantName: "Vipin", roomNo: "8", lastMeterUnit: 138, currentMeterUnit: 189, unitsConsumed: 51, ratePerUnit: 7, electricityAmount: 357, waterCharges: 0, rentAmount: 4000, otherCharges: 0, totalAmount: 4357, amountReceived: 0, balance: 4357, summaryMsg: "Units 51@7= Rs 357+4000= 4357/- Rent" },
-      { id: 1722800000009, monthYear: "2026-08", tenantName: "Rajkumar", roomNo: "9", lastMeterUnit: 91, currentMeterUnit: 131, unitsConsumed: 40, ratePerUnit: 7, electricityAmount: 280, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5580, amountReceived: 0, balance: 5580, summaryMsg: "Units 40@7= Rs 280+300 Water+5000= 5580/- Rent" },
-      { id: 1722800000010, monthYear: "2026-08", tenantName: "Sailendra/Chandan", roomNo: "10", lastMeterUnit: 2, currentMeterUnit: 90, unitsConsumed: 88, ratePerUnit: 7, electricityAmount: 616, waterCharges: 600, rentAmount: 8000, otherCharges: 0, totalAmount: 9216, amountReceived: 0, balance: 9216, summaryMsg: "Units 88@7= Rs 616+600 Water+8000= 9216/- Rent" },
-      { id: 1722800000011, monthYear: "2026-08", tenantName: "Ishant/Akhil", roomNo: "11", lastMeterUnit: 214, currentMeterUnit: 342, unitsConsumed: 128, ratePerUnit: 6, electricityAmount: 768, waterCharges: 300, rentAmount: 4000, otherCharges: 0, totalAmount: 5068, amountReceived: 0, balance: 5068, summaryMsg: "Units 128@6= Rs 768+300 Water+4000= 5068/- Rent" },
-      { id: 1722800000012, monthYear: "2026-08", tenantName: "Neelam", roomNo: "12", lastMeterUnit: 752, currentMeterUnit: 1080, unitsConsumed: 328, ratePerUnit: 6, electricityAmount: 1968, waterCharges: 300, rentAmount: 7500, otherCharges: 0, totalAmount: 9768, amountReceived: 0, balance: 9768, summaryMsg: "Units 328@6= Rs 1968+300 Water+7500= 9768/- Rent" }
+      { id: 1722800000001, monthYear: "2026-08", tenantName: "Rohit Kumar", roomNo: "1", lastMeterUnit: 157, currentMeterUnit: 194, unitsConsumed: 37, ratePerUnit: 7, electricityAmount: 259, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5559, paymentStatus: "no", amountReceived: 0, balance: 5559, summaryMsg: "Units 37@7= Rs 259+300 Water+5000= 5559/- Rent" },
+      { id: 1722800000002, monthYear: "2026-08", tenantName: "Harish", roomNo: "2", lastMeterUnit: 136, currentMeterUnit: 174, unitsConsumed: 38, ratePerUnit: 7, electricityAmount: 266, waterCharges: 300, rentAmount: 4500, otherCharges: 0, totalAmount: 5066, paymentStatus: "no", amountReceived: 0, balance: 5066, summaryMsg: "Units 38@7= Rs 266+300 Water+4500= 5066/- Rent" },
+      { id: 1722800000003, monthYear: "2026-08", tenantName: "Parveen", roomNo: "3", lastMeterUnit: 141, currentMeterUnit: 178, unitsConsumed: 37, ratePerUnit: 7, electricityAmount: 259, waterCharges: 0, rentAmount: 8000, otherCharges: 0, totalAmount: 8259, paymentStatus: "no", amountReceived: 0, balance: 8259, summaryMsg: "Units 37@7= Rs 259+8000= 8259/- Rent" },
+      { id: 1722800000004, monthYear: "2026-08", tenantName: "Pankaj", roomNo: "4", lastMeterUnit: 165, currentMeterUnit: 200, unitsConsumed: 35, ratePerUnit: 7, electricityAmount: 245, waterCharges: 150, rentAmount: 4500, otherCharges: 0, totalAmount: 4745, paymentStatus: "no", amountReceived: 0, balance: 4745, summaryMsg: "Units 35@7= Rs 245+150 Water+4500= 4745/- Rent" },
+      { id: 1722800000006, monthYear: "2026-08", tenantName: "Mahindra", roomNo: "6", lastMeterUnit: 80, currentMeterUnit: 128, unitsConsumed: 48, ratePerUnit: 7, electricityAmount: 336, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5636, paymentStatus: "no", amountReceived: 0, balance: 5636, summaryMsg: "Units 48@7= Rs 336+300 Water+5000= 5636/- Rent" },
+      { id: 1722800000007, monthYear: "2026-08", tenantName: "Hariom", roomNo: "7", lastMeterUnit: 88, currentMeterUnit: 136, unitsConsumed: 48, ratePerUnit: 7, electricityAmount: 336, waterCharges: 300, rentAmount: 4500, otherCharges: 0, totalAmount: 5136, paymentStatus: "no", amountReceived: 0, balance: 5136, summaryMsg: "Units 48@7= Rs 336+300 Water+4500= 5136/- Rent" },
+      { id: 1722800000008, monthYear: "2026-08", tenantName: "Vipin", roomNo: "8", lastMeterUnit: 138, currentMeterUnit: 189, unitsConsumed: 51, ratePerUnit: 7, electricityAmount: 357, waterCharges: 0, rentAmount: 4000, otherCharges: 0, totalAmount: 4357, paymentStatus: "no", amountReceived: 0, balance: 4357, summaryMsg: "Units 51@7= Rs 357+4000= 4357/- Rent" },
+      { id: 1722800000009, monthYear: "2026-08", tenantName: "Rajkumar", roomNo: "9", lastMeterUnit: 91, currentMeterUnit: 131, unitsConsumed: 40, ratePerUnit: 7, electricityAmount: 280, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5580, paymentStatus: "no", amountReceived: 0, balance: 5580, summaryMsg: "Units 40@7= Rs 280+300 Water+5000= 5580/- Rent" },
+      { id: 1722800000010, monthYear: "2026-08", tenantName: "Sailendra/Chandan", roomNo: "10", lastMeterUnit: 2, currentMeterUnit: 90, unitsConsumed: 88, ratePerUnit: 7, electricityAmount: 616, waterCharges: 600, rentAmount: 8000, otherCharges: 0, totalAmount: 9216, paymentStatus: "no", amountReceived: 0, balance: 9216, summaryMsg: "Units 88@7= Rs 616+600 Water+8000= 9216/- Rent" },
+      { id: 1722800000011, monthYear: "2026-08", tenantName: "Ishant/Akhil", roomNo: "11", lastMeterUnit: 214, currentMeterUnit: 342, unitsConsumed: 128, ratePerUnit: 6, electricityAmount: 768, waterCharges: 300, rentAmount: 4000, otherCharges: 0, totalAmount: 5068, paymentStatus: "no", amountReceived: 0, balance: 5068, summaryMsg: "Units 128@6= Rs 768+300 Water+4000= 5068/- Rent" },
+      { id: 1722800000012, monthYear: "2026-08", tenantName: "Neelam", roomNo: "12", lastMeterUnit: 752, currentMeterUnit: 1080, unitsConsumed: 328, ratePerUnit: 6, electricityAmount: 1968, waterCharges: 300, rentAmount: 7500, otherCharges: 0, totalAmount: 9768, paymentStatus: "no", amountReceived: 0, balance: 9768, summaryMsg: "Units 328@6= Rs 1968+300 Water+7500= 9768/- Rent" }
     ];
 
     let storedRecords = localStorage.getItem("tenantRecordsV2");
@@ -339,6 +411,7 @@
     const formTitle = document.getElementById("formTitle");
     const submitBtn = document.getElementById("submitBtn");
     const filterMonthInput = document.getElementById("filterMonth");
+    const paymentStatusSelect = document.getElementById("paymentStatus");
 
     const currentMonthVal = "2026-08";
     document.getElementById("monthYear").value = currentMonthVal;
@@ -368,6 +441,18 @@
       }
     });
 
+    paymentStatusSelect.addEventListener("change", () => {
+      const status = paymentStatusSelect.value;
+      const total = parseFloat(document.getElementById("totalAmount").value) || 0;
+
+      if (status === "yes") {
+        document.getElementById("amountReceived").value = total;
+      } else if (status === "no") {
+        document.getElementById("amountReceived").value = 0;
+      }
+      calculateBills();
+    });
+
     function calculateBills() {
       const lastUnit = parseFloat(document.getElementById("lastMeterUnit").value) || 0;
       const currentUnit = parseFloat(document.getElementById("currentMeterUnit").value) || 0;
@@ -375,7 +460,7 @@
       const water = parseFloat(document.getElementById("waterCharges").value) || 0;
       const rent = parseFloat(document.getElementById("rentAmount").value) || 0;
       const other = parseFloat(document.getElementById("otherCharges").value) || 0;
-      const received = parseFloat(document.getElementById("amountReceived").value) || 0;
+      let received = parseFloat(document.getElementById("amountReceived").value) || 0;
 
       let units = currentUnit - lastUnit;
       if (units < 0) units = 0;
@@ -386,6 +471,11 @@
 
       const total = electricityTotal + water + rent + other;
       document.getElementById("totalAmount").value = total;
+
+      if (paymentStatusSelect.value === "yes") {
+        received = total;
+        document.getElementById("amountReceived").value = total;
+      }
 
       const balance = total - received;
       document.getElementById("balance").value = balance;
@@ -421,6 +511,7 @@
         rentAmount: parseFloat(document.getElementById("rentAmount").value) || 0,
         otherCharges: parseFloat(document.getElementById("otherCharges").value) || 0,
         totalAmount: parseFloat(document.getElementById("totalAmount").value) || 0,
+        paymentStatus: paymentStatusSelect.value,
         amountReceived: parseFloat(document.getElementById("amountReceived").value) || 0,
         balance: parseFloat(document.getElementById("balance").value) || 0,
         summaryMsg: summaryMsg
@@ -453,6 +544,7 @@
       document.getElementById("waterCharges").value = record.waterCharges;
       document.getElementById("rentAmount").value = record.rentAmount;
       document.getElementById("otherCharges").value = record.otherCharges;
+      paymentStatusSelect.value = record.paymentStatus || (record.balance === 0 ? "yes" : "no");
       document.getElementById("amountReceived").value = record.amountReceived;
 
       editRoomText.innerText = record.roomNo;
@@ -481,6 +573,7 @@
       document.getElementById("monthYear").value = filterMonthInput.value || currentMonthVal;
       document.getElementById("ratePerUnit").value = 7;
       document.getElementById("rentAmount").value = 5000;
+      paymentStatusSelect.value = "no";
     }
 
     function deleteRecord(id, event) {
@@ -506,7 +599,7 @@
         return;
       }
 
-      const headers = ["Month/Year", "Room No", "Tenant Name", "Last Meter Unit", "Current Meter Unit", "Units Consumed", "Rate per Unit", "Electricity Amount", "Water Charges", "Rent Amount", "Pending/Other Charges", "Total Amount", "Amount Received", "Balance Due", "Summary Message"];
+      const headers = ["Month/Year", "Room No", "Tenant Name", "Last Meter Unit", "Current Meter Unit", "Units Consumed", "Rate per Unit", "Electricity Amount", "Water Charges", "Rent Amount", "Pending/Other Charges", "Total Amount", "Payment Status", "Amount Received", "Balance Due", "Summary Message"];
       const csvRows = [headers.join(",")];
 
       records.forEach(r => {
@@ -523,6 +616,7 @@
           r.rentAmount,
           r.otherCharges,
           r.totalAmount,
+          `"${r.paymentStatus || 'no'}"`,
           r.amountReceived,
           r.balance,
           `"${r.summaryMsg.replace(/"/g, '""')}"`
@@ -552,39 +646,69 @@
       const tableBody = document.getElementById("tableBody");
       tableBody.innerHTML = "";
 
+      let totUnits = 0, totElec = 0, totWater = 0, totRent = 0, totOther = 0, totBill = 0, totRec = 0, totBal = 0;
+
       if (filtered.length === 0) {
-        tableBody.innerHTML = `<tr><td colspan="16" style="text-align:center; color:#64748b; padding: 20px;">No records found for the selected month/search.</td></tr>`;
-        return;
+        tableBody.innerHTML = `<tr><td colspan="17" style="text-align:center; color:#64748b; padding: 20px;">No records found for the selected month/search.</td></tr>`;
+      } else {
+        filtered.sort((a, b) => b.id - a.id).forEach(r => {
+          totUnits += r.unitsConsumed || 0;
+          totElec += r.electricityAmount || 0;
+          totWater += r.waterCharges || 0;
+          totRent += r.rentAmount || 0;
+          totOther += r.otherCharges || 0;
+          totBill += r.totalAmount || 0;
+          totRec += r.amountReceived || 0;
+          totBal += r.balance || 0;
+
+          const row = document.createElement("tr");
+          row.className = "table-row-item";
+          row.onclick = () => selectUserSummary(r.id);
+
+          const statusBadge = r.balance === 0 ? '<span class="badge-paid">Paid</span>' : (r.amountReceived > 0 ? '<span style="color: var(--warning);">Partial</span>' : '<span class="badge-due">Pending</span>');
+
+          row.innerHTML = `
+            <td style="white-space: nowrap;">
+              <button class="btn-action btn-edit" onclick="event.stopPropagation(); selectUserSummary(${r.id})">View/Edit</button>
+              <button class="btn-action btn-delete" onclick="deleteRecord(${r.id}, event)">Delete</button>
+            </td>
+            <td>${r.monthYear}</td>
+            <td>${r.roomNo}</td>
+            <td><strong>${r.tenantName}</strong></td>
+            <td>${r.lastMeterUnit}</td>
+            <td>${r.currentMeterUnit}</td>
+            <td>${r.unitsConsumed}</td>
+            <td>${r.ratePerUnit}</td>
+            <td>₹${r.electricityAmount}</td>
+            <td>₹${r.waterCharges}</td>
+            <td>₹${r.rentAmount}</td>
+            <td>₹${r.otherCharges}</td>
+            <td><strong>₹${r.totalAmount}</strong></td>
+            <td>${statusBadge}</td>
+            <td>₹${r.amountReceived}</td>
+            <td class="${r.balance > 0 ? 'badge-due' : 'badge-paid'}">₹${r.balance}</td>
+            <td class="msg-col">${r.summaryMsg}</td>
+          `;
+          tableBody.appendChild(row);
+        });
       }
 
-      filtered.sort((a, b) => b.id - a.id).forEach(r => {
-        const row = document.createElement("tr");
-        row.className = "table-row-item";
-        row.onclick = () => selectUserSummary(r.id);
+      // Update Dashboard KPI Cards
+      document.getElementById("kpiRent").innerText = `₹${totRent.toLocaleString()}`;
+      document.getElementById("kpiElec").innerText = `₹${totElec.toLocaleString()}`;
+      document.getElementById("kpiWater").innerText = `₹${totWater.toLocaleString()}`;
+      document.getElementById("kpiReceived").innerText = `₹${totRec.toLocaleString()}`;
+      document.getElementById("kpiPending").innerText = `₹${totBal.toLocaleString()}`;
 
-        row.innerHTML = `
-          <td style="white-space: nowrap;">
-            <button class="btn-action btn-edit" onclick="event.stopPropagation(); selectUserSummary(${r.id})">View/Edit</button>
-            <button class="btn-action btn-delete" onclick="deleteRecord(${r.id}, event)">Delete</button>
-          </td>
-          <td>${r.monthYear}</td>
-          <td>${r.roomNo}</td>
-          <td><strong>${r.tenantName}</strong></td>
-          <td>${r.lastMeterUnit}</td>
-          <td>${r.currentMeterUnit}</td>
-          <td>${r.unitsConsumed}</td>
-          <td>${r.ratePerUnit}</td>
-          <td>${r.electricityAmount}</td>
-          <td>${r.waterCharges}</td>
-          <td>${r.rentAmount}</td>
-          <td>${r.otherCharges}</td>
-          <td><strong>${r.totalAmount}</strong></td>
-          <td>${r.amountReceived}</td>
-          <td class="${r.balance > 0 ? 'badge-due' : 'badge-paid'}">${r.balance}</td>
-          <td class="msg-col">${r.summaryMsg}</td>
-        `;
-        tableBody.appendChild(row);
-      });
+      // Update Table Footer Totals
+      document.getElementById("totUnits").innerText = totUnits;
+      document.getElementById("totElec").innerText = `₹${totElec}`;
+      document.getElementById("totWater").innerText = `₹${totWater}`;
+      document.getElementById("totRent").innerText = `₹${totRent}`;
+      document.getElementById("totOther").innerText = `₹${totOther}`;
+      document.getElementById("totBill").innerText = `₹${totBill}`;
+      document.getElementById("totRec").innerText = `₹${totRec}`;
+      document.getElementById("totBal").innerText = `₹${totBal}`;
     }
 
     document.getElementById("searchInput").addEventListener("input", renderTable);
