@@ -53,14 +53,14 @@
 
     .form-group { margin-bottom: 10px; }
     label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; color: #334155; }
-    input {
+    input, select {
       width: 100%;
       padding: 8px 10px;
       border: 1px solid var(--border);
       border-radius: 6px;
       font-size: 0.9rem;
     }
-    input:focus { outline: 2px solid var(--primary); border-color: transparent; }
+    input:focus, select:focus { outline: 2px solid var(--primary); border-color: transparent; }
     input[readonly] { background-color: #f1f5f9; font-weight: 700; color: #0f172a; }
 
     .edit-banner {
@@ -151,7 +151,8 @@
     table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; min-width: 1300px; }
     th, td { padding: 10px; border: 1px solid var(--border); }
     th { background-color: #f8fafc; font-weight: 700; color: #475569; }
-    tr:nth-child(even) { background-color: #f8fafc; }
+    tr.table-row-item { cursor: pointer; transition: background 0.15s; }
+    tr.table-row-item:hover { background-color: #f1f5f9 !important; }
 
     .badge-due { color: var(--danger); font-weight: bold; }
     .badge-paid { color: var(--success); font-weight: bold; }
@@ -258,7 +259,7 @@
       <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
         <div>
           <h2 style="font-size: 1.1rem; margin-bottom: 10px;">Tenant Bill Summary</h2>
-          <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">Copy this message directly to send to your tenant via WhatsApp/SMS:</p>
+          <p style="font-size: 0.8rem; color: #64748b; margin-bottom: 10px;">Select a tenant row from history to auto-fill their summary here:</p>
           <div id="msgPreview" class="msg-preview">Units 0@0= Rs 0+5000= 5000/- Rent</div>
         </div>
         <button id="copyBtn" class="btn btn-copy" onclick="copyMessage()">Copy Message</button>
@@ -269,8 +270,10 @@
     <div class="card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-wrap: wrap; gap: 10px;">
         <h2 style="font-size: 1.1rem;">History & Saved Bills</h2>
-        <div style="display: flex; gap: 10px;">
-          <input type="text" id="searchInput" placeholder="Search tenant or room..." style="width: 220px;">
+        <div style="display: flex; gap: 10px; align-items: center;">
+          <label style="font-size: 0.85rem; font-weight: bold; margin: 0;">Filter Month:</label>
+          <input type="month" id="filterMonth" style="width: 170px;">
+          <input type="text" id="searchInput" placeholder="Search tenant or room..." style="width: 200px;">
           <button class="btn-export" onclick="exportToCSV()">📥 Export to Excel (CSV)</button>
         </div>
       </div>
@@ -304,7 +307,7 @@
   </div>
 
   <script>
-    // PRE-LOADED SPREADSHEET DATA (August 2026) WITH UPDATED DYNAMIC WATER SUMMARY
+    // PRE-LOADED DATA
     const initialDefaultData = [
       { id: 1722800000001, monthYear: "2026-08", tenantName: "Rohit Kumar", roomNo: "1", lastMeterUnit: 157, currentMeterUnit: 194, unitsConsumed: 37, ratePerUnit: 7, electricityAmount: 259, waterCharges: 300, rentAmount: 5000, otherCharges: 0, totalAmount: 5559, amountReceived: 0, balance: 5559, summaryMsg: "Units 37@7= Rs 259+300 Water+5000= 5559/- Rent" },
       { id: 1722800000002, monthYear: "2026-08", tenantName: "Harish", roomNo: "2", lastMeterUnit: 136, currentMeterUnit: 174, unitsConsumed: 38, ratePerUnit: 7, electricityAmount: 266, waterCharges: 300, rentAmount: 4500, otherCharges: 0, totalAmount: 5066, amountReceived: 0, balance: 5066, summaryMsg: "Units 38@7= Rs 266+300 Water+4500= 5066/- Rent" },
@@ -319,9 +322,12 @@
       { id: 1722800000012, monthYear: "2026-08", tenantName: "Neelam", roomNo: "12", lastMeterUnit: 752, currentMeterUnit: 1080, unitsConsumed: 328, ratePerUnit: 6, electricityAmount: 1968, waterCharges: 300, rentAmount: 7500, otherCharges: 0, totalAmount: 9768, amountReceived: 0, balance: 9768, summaryMsg: "Units 328@6= Rs 1968+300 Water+7500= 9768/- Rent" }
     ];
 
-    // Force refresh initial data to apply updated format
-    localStorage.setItem("tenantRecordsV2", JSON.stringify(initialDefaultData));
-    let records = initialDefaultData;
+    let storedRecords = localStorage.getItem("tenantRecordsV2");
+    let records = storedRecords ? JSON.parse(storedRecords) : initialDefaultData;
+
+    if (!storedRecords) {
+      localStorage.setItem("tenantRecordsV2", JSON.stringify(initialDefaultData));
+    }
 
     const form = document.getElementById("tenantForm");
     const calcInputs = document.querySelectorAll(".calc-input");
@@ -332,10 +338,12 @@
     const editRoomText = document.getElementById("editRoomText");
     const formTitle = document.getElementById("formTitle");
     const submitBtn = document.getElementById("submitBtn");
+    const filterMonthInput = document.getElementById("filterMonth");
 
-    document.getElementById("monthYear").value = new Date().toISOString().slice(0, 7);
+    const currentMonthVal = "2026-08";
+    document.getElementById("monthYear").value = currentMonthVal;
+    filterMonthInput.value = currentMonthVal;
 
-    // AUTO-FETCH Previous Reading & Balance when Room No is typed
     roomInput.addEventListener("input", () => {
       if (editingRecordId.value) return;
 
@@ -382,7 +390,6 @@
       const balance = total - received;
       document.getElementById("balance").value = balance;
 
-      // Dynamic Water String Construction
       let waterText = water > 0 ? `+${water} Water` : ``;
       let otherText = other > 0 ? `+${other} Pending` : ``;
 
@@ -432,7 +439,7 @@
       renderTable();
     });
 
-    function editRecord(id) {
+    function selectUserSummary(id) {
       const record = records.find(r => r.id === id);
       if (!record) return;
 
@@ -450,7 +457,7 @@
 
       editRoomText.innerText = record.roomNo;
       editBanner.style.display = "flex";
-      formTitle.innerText = "Edit Existing Bill Record";
+      formTitle.innerText = "Viewing Record for Room " + record.roomNo;
       submitBtn.innerText = "Update Record";
       submitBtn.style.backgroundColor = "var(--warning)";
 
@@ -471,12 +478,13 @@
       submitBtn.style.backgroundColor = "var(--primary)";
 
       form.reset();
-      document.getElementById("monthYear").value = new Date().toISOString().slice(0, 7);
+      document.getElementById("monthYear").value = filterMonthInput.value || currentMonthVal;
       document.getElementById("ratePerUnit").value = 7;
       document.getElementById("rentAmount").value = 5000;
     }
 
-    function deleteRecord(id) {
+    function deleteRecord(id, event) {
+      event.stopPropagation();
       if (confirm("Are you sure you want to delete this record?")) {
         records = records.filter(r => r.id !== id);
         localStorage.setItem("tenantRecordsV2", JSON.stringify(records));
@@ -533,20 +541,31 @@
 
     function renderTable() {
       const search = document.getElementById("searchInput").value.toLowerCase();
-      const filtered = records.filter(r => 
-        r.tenantName.toLowerCase().includes(search) || 
-        r.roomNo.toLowerCase().includes(search)
-      );
+      const selectedMonth = filterMonthInput.value;
+
+      const filtered = records.filter(r => {
+        const matchesSearch = r.tenantName.toLowerCase().includes(search) || r.roomNo.toLowerCase().includes(search);
+        const matchesMonth = selectedMonth ? r.monthYear === selectedMonth : true;
+        return matchesSearch && matchesMonth;
+      });
 
       const tableBody = document.getElementById("tableBody");
       tableBody.innerHTML = "";
 
+      if (filtered.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="16" style="text-align:center; color:#64748b; padding: 20px;">No records found for the selected month/search.</td></tr>`;
+        return;
+      }
+
       filtered.sort((a, b) => b.id - a.id).forEach(r => {
         const row = document.createElement("tr");
+        row.className = "table-row-item";
+        row.onclick = () => selectUserSummary(r.id);
+
         row.innerHTML = `
           <td style="white-space: nowrap;">
-            <button class="btn-action btn-edit" onclick="editRecord(${r.id})">Edit</button>
-            <button class="btn-action btn-delete" onclick="deleteRecord(${r.id})">Delete</button>
+            <button class="btn-action btn-edit" onclick="event.stopPropagation(); selectUserSummary(${r.id})">View/Edit</button>
+            <button class="btn-action btn-delete" onclick="deleteRecord(${r.id}, event)">Delete</button>
           </td>
           <td>${r.monthYear}</td>
           <td>${r.roomNo}</td>
@@ -569,6 +588,7 @@
     }
 
     document.getElementById("searchInput").addEventListener("input", renderTable);
+    filterMonthInput.addEventListener("change", renderTable);
 
     renderTable();
     calculateBills();
